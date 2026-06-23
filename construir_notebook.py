@@ -181,6 +181,28 @@ print('Mezcla guitarra + voz (PV + formantes):')
 display(Audio('outputs/mezcla_pv_formant.wav'))
 """))
 
+cells.append(md(r"""### 5.6 Aplicación alternativa: Miku Stomp digital
+
+Aplicación del método al flujo del pedal **Korg Miku Stomp** en DSP puro: **guitarra -> detectar la
+nota (pYIN) -> afinar una voz a esa nota -> mezclar**. La voz sigue el contorno de tono de la guitarra
+(glissando) con preservación de formantes. El cuaderno autocontenido para Colab es
+`miku_stomp_colab.ipynb`. Afinación de la voz vs la guitarra:
+"""))
+cells.append(code(r"""display(Image('figuras/fig08_stomp_f0.png'))
+display(Image('figuras/fig09_stomp_modos.png'))
+st = res.get('stomp', {})
+if st:
+    print('Miku Stomp: %d notas, offset global = %d octavas, voz f0 = %.0f Hz' %
+          (st['n_notas'], st['global_octave'], st['voice_f0']))
+    for m, a in st['afinacion'].items():
+        print('  %-12s error afinacion mediano = %s cents | dentro de 1 semitono = %s%%' %
+              (m, round(a['cents_median']) if a['cents_median'] is not None else '-',
+               round(a['within_semitone_pct']) if a['within_semitone_pct'] is not None else '-'))
+for m in ['resample', 'pv_formant']:
+    print('Stomp —', G.METHOD_LABEL[m]); display(Audio('outputs/stomp_%s.wav' % m))
+print('Mezcla guitarra + voz (stomp):'); display(Audio('outputs/stomp_mezcla_final.wav'))
+"""))
+
 cells.append(md(r"""## 6. Discusión (Etapa 5)
 
 - **Lo más difícil de comprender:** la **propagación de fase** por frecuencia instantánea y el

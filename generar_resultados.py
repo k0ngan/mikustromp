@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 import soundfile as sf
 
 import vocoder as V
+import stomp as S
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIG = os.path.join(HERE, 'figuras')
@@ -283,6 +284,74 @@ def exp_sintesis(base_audio):
     print('SINTESIS: voces generadas (%d unidades en la base)' % len(db))
 
 
+# ============================================================================= FIG 8+9
+# Aplicación alternativa: "Miku Stomp digital" (pedal Korg en DSP puro).
+def exp_stomp(base_audio):
+    sr = SR
+    g = base_audio[:int(5.0 * sr)]                       # 5 s (pYIN razonable)
+    vpath = os.path.join(HERE, 'voces', 'miku_voice.wav')
+    voice = V.load_audio(vpath, sr) if os.path.exists(vpath) else V.synth_vowel(200.0, 'a', 0.6)
+    grain, vf0 = S.prep_voice_grain(voice, sr)
+    times, f0, voiced = S.track_f0_pyin(g, sr)
+    notes = S.segment_notes(times, f0, voiced)
+    K = S.compute_global_octave(f0, voiced, vf0)
+
+    # FIG8: contorno de f0 (pYIN) + notas sobre el espectrograma de la guitarra
+    X = V.stft(g, n_fft=1024, hop=256)
+    Sg = 20 * np.log10(np.abs(X).T + 1e-6)
+    ff = np.fft.rfftfreq(1024, 1.0 / sr); tt = np.arange(X.shape[0]) * 256 / sr
+    mm = ff <= 2000
+    fig, ax = plt.subplots(figsize=(11, 4.2))
+    ax.pcolormesh(tt, ff[mm], Sg[mm], shading='auto', cmap='magma', vmin=Sg.max() - 70, vmax=Sg.max())
+    ax.plot(times, f0, '.', ms=5, color='cyan', label='f0 (pYIN)')
+    for (a, b, c) in notes:
+        ax.hlines(c, a, b, color='white', lw=2.5)
+    ax.set_ylim(0, 2000); ax.set_xlabel('tiempo [s]'); ax.set_ylabel('Hz')
+    ax.set_title('Miku Stomp: contorno de f0 (pYIN) y notas sobre el espectrograma')
+    ax.legend(loc='upper right', fontsize=9)
+    fig.tight_layout(); fig.savefig(os.path.join(FIG, 'fig08_stomp_f0.png'), dpi=130); plt.close(fig)
+
+    # Síntesis 3 modos + medición de afinación (voz vs target = guitarra * 2^-K, con pliegue de extremos)
+    import librosa
+    metrics, voices = {}, {}
+    for m in METHODS:
+        wet = S.miku_stomp_glide(times, f0, voiced, sr, grain, vf0, len(g), method=m)
+        voices[m] = wet
+        sf.write(os.path.join(OUT, 'stomp_%s.wav' % m), V.normalize_audio(wet), sr)
+        wf0, _, _ = librosa.pyin(wet.astype(float), fmin=80, fmax=1200, sr=sr,
+                                 frame_length=2048, hop_length=512)
+        wt = librosa.times_like(wf0, sr=sr, hop_length=512)
+        errs = []
+        for i, tc in enumerate(wt):
+            if not np.isfinite(wf0[i]):
+                continue
+            j = int(np.argmin(np.abs(times - tc)))
+            if not (voiced[j] and np.isfinite(f0[j])):
+                continue
+            ns = S._octave_clamp(12.0 * np.log2(f0[j] / vf0) - 12.0 * K, 12.0)
+            target = vf0 * 2 ** (ns / 12.0)
+            errs.append(abs(1200.0 * np.log2(wf0[i] / target)))
+        errs = np.array(errs)
+        metrics[m] = {'cents_median': float(np.median(errs)) if errs.size else None,
+                      'within_semitone_pct': float(100 * np.mean(errs < 100)) if errs.size else None}
+
+    # FIG9: espectrogramas de la voz por método
+    fig, ax = plt.subplots(1, 3, figsize=(13, 4))
+    for a, m in zip(ax, METHODS):
+        plot_spectro(a, voices[m], METHOD_LABEL[m])
+    fig.suptitle('Miku Stomp: voz que sigue la melodía de la guitarra, por método',
+                 fontsize=12, fontweight='bold')
+    fig.tight_layout(); fig.savefig(os.path.join(FIG, 'fig09_stomp_modos.png'), dpi=130); plt.close(fig)
+
+    final = V.mix_over(g, voices['pv_formant'], mix=0.6)
+    sf.write(os.path.join(OUT, 'stomp_mezcla_final.wav'), V.normalize_audio(final), sr)
+
+    results['stomp'] = {'voice_f0': vf0, 'global_octave': int(K), 'n_notas': len(notes),
+                        'afinacion': metrics}
+    print('STOMP: notas=%d K=%d | afinacion (cents medianos) ' % (len(notes), K) +
+          ' '.join('%s=%.0f' % (m, metrics[m]['cents_median'] or -1) for m in METHODS))
+
+
 # ============================================================================= main
 def main():
     print('=== Generando resultados (semilla=%d) ===' % SEED)
@@ -303,6 +372,7 @@ def main():
     grain = db[len(db) // 2]['wave'] if db else flat_tone(200.0, 0.14)
     fig_grano_real(grain)
     exp_sintesis(base_audio)
+    exp_stomp(base_audio)
 
     with open(os.path.join(HERE, 'resultados.json'), 'w', encoding='utf-8') as fh:
         json.dump(results, fh, ensure_ascii=False, indent=2)

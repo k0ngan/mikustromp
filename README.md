@@ -10,6 +10,9 @@ Francisco Alejandro Pinto Abraham — RUT 21.571.239-7
 
 **Artículo:** M. Dolson, *"The Phase Vocoder: A Tutorial"*, *Computer Music Journal*, 10(4):14–27, 1986.
 
+> **Cumplimiento de la pauta:** ver [`ENTREGABLES.md`](ENTREGABLES.md) — mapea cada entregable, etapa y
+> criterio de la rúbrica a su archivo.
+
 ## Idea en una línea
 
 Cambiar el **tono** de un sonido **sin cambiar su duración** (phase vocoder) y, como extensión,
@@ -35,6 +38,8 @@ Cambiar el **tono** de un sonido **sin cambiar su duración** (phase vocoder) y,
 | `generar_informe.py` | Genera el informe PDF (estructura tipo IEEE) con `reportlab`. |
 | `informe_phase_vocoder_pddi.pdf` | **Informe formal**. |
 | `presentacion/build_presentation.py` | Arma el video narrado (slides + TTS + ffmpeg). |
+| `generar_presentacion_pdf.py` | Arma las **diapositivas PDF (16:9, beamer-like)** de la presentación oral. |
+| `presentacion/presentacion_phase_vocoder_stomp.pdf` | **Presentación oral** (12 diapositivas: phase vocoder + Miku Stomp). |
 | `stomp.py` | **Modo Stomp:** pYIN + segmentación de notas + síntesis tipo pedal (reusa `vocoder.py`). |
 | `construir_stomp.py` | Arma `miku_stomp_colab.ipynb` (embebe el núcleo DSP). |
 | `miku_stomp_colab.ipynb` | **Cuaderno Colab autocontenido** del "Miku Stomp digital". |

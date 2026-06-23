@@ -2,7 +2,6 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .venv*/
-# intermedios regenerables de la presentación (el MP4 final sí se versiona)
 presentacion/segmentos/
 presentacion/audio/
 presentacion/slides/

@@ -205,12 +205,15 @@ plt.xlabel("tiempo [s]"); plt.ylabel("Hz"); plt.legend(loc="upper right"); plt.s
 """))
 
 cells.append(md("## 6. Síntesis: 3 modos (robótico vs limpio)\n"
+                "La voz **sigue el contorno de tono** de la guitarra (glissando continuo), transpuesto "
+                "a un registro cantable. Modos:\n"
                 "- **resample** — afinado por remuestreo (corre formantes): suena robótico, **como el "
                 "pedal**.\n- **pv** — phase vocoder.\n- **pv_formant** — phase vocoder con formantes: "
                 "mantiene el timbre, **mejor que el pedal**.\nEscucha el A/B."))
 cells.append(code(r"""voices = {}
 for method in ["resample", "pv", "pv_formant"]:
-    voices[method] = miku_stomp(notes, SR, voice_grain, voice_f0, len(guitar), method=method)
+    voices[method] = miku_stomp_glide(times, f0, voiced, SR, voice_grain, voice_f0,
+                                      len(guitar), method=method)
 
 labels = {"resample": "Remuestreo (robótico, como el pedal)",
           "pv": "Phase vocoder",

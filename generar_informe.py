@@ -26,6 +26,7 @@ with open(os.path.join(HERE, "resultados.json"), encoding="utf-8") as f:
 TD = R["tono_duracion_resumen"]
 FO = R["formantes_resumen"]
 RE = R["reproduccion"]
+ST = R.get("stomp", {})
 
 PAGE_W = A4[0]
 MARGIN = 2.2 * cm
@@ -221,36 +222,80 @@ fig("fig05_grano_real.png", caption="Fig. 5. Grano de guitarra desplazado +7 sem
 fig("fig06_sintesis_ondas.png", caption="Fig. 6. Formas de onda de la voz concatenativa por método.")
 fig("fig07_sintesis_espectros.png", caption="Fig. 7. Espectrogramas de la voz sintetizada por método.")
 
-h1("8. Discusión")
-p("<b>Casos exitosos.</b> En desplazamientos moderados (-7 a +3 semitonos) sobre sonidos "
-  "cuasi-estacionarios, el phase vocoder conserva perfectamente la duración y la extensión preserva el "
-  "timbre, algo imposible con el remuestreo.")
-p("<b>Casos de falla.</b> Para saltos grandes (>= +5–7 semitonos) la corrección de formantes se "
-  "degrada (Fig. 3, der.): la envolvente desplazada se solapa poco con la original y la máscara, "
-  "limitada a ±60 dB, no alcanza a restituirla. Además, el phase vocoder <b>emborrona los "
-  "transitorios</b> (ataques de la guitarra) y aparece algo de <i>phasiness</i>, tal como advierte "
-  "Dolson. El error de afinación del phase vocoder, aunque sub-audible, es mayor que el del remuestreo "
-  "(interpolación de magnitud entre tramas).")
-p("<b>Causas.</b> El phase vocoder asume estacionariedad dentro de la ventana; los transitorios y los "
-  "grandes desplazamientos violan ese supuesto. La envolvente por cepstrum es global por grano y no "
-  "captura bien formantes muy juntos.")
+h1("8. Aplicación alternativa: Miku Stomp digital")
+p("Como aplicación, se replicó el flujo del pedal <b>Korg Miku Stomp</b> en DSP puro: "
+  "<b>guitarra -&gt; detectar la nota -&gt; afinar una voz a esa nota -&gt; mezclar</b>. La detección de tono usa "
+  "<b>pYIN</b> (YIN probabilístico, algoritmo clásico, no una red neuronal); la voz se afina con el "
+  "phase vocoder con preservación de formantes (Sec. 5), por lo que mantiene su timbre al seguir la "
+  "melodía —a diferencia del pedal original, que corre los formantes (efecto “ardilla”). La voz fuente "
+  "es una muestra real de Vocaloid 4 (CyberDiva); uso académico declarado.")
+p("<b>Problema detectado y solución.</b> Una primera versión desafinaba: (i) pYIN se enganchaba a "
+  "armónicos de la guitarra (errores de octava) — se corrigió bajando <font face='Courier'>fmax</font> "
+  "a 600 Hz, reparando saltos de octava y suavizando el contorno; (ii) la voz se sintetiza siguiendo el "
+  "contorno de f0 de forma continua (glissando, por <i>overlap-add</i>), transponiendo toda la melodía "
+  "por un <b>número entero de octavas</b> a un registro cantable (conserva el contorno) y plegando por "
+  "octavas solo las notas fuera de rango; (iii) se elige un grano de voz de tono estable.")
+if ST.get("afinacion"):
+    af = ST["afinacion"]
+    def _md(m, k):
+        v = af.get(m, {}).get(k)
+        return "%.0f" % v if v is not None else "-"
+    tabla([
+        ["Método", "Error afinación mediano [cents]", "Notas dentro de 1 semitono [%]"],
+        ["Remuestreo", _md("resample", "cents_median"), _md("resample", "within_semitone_pct")],
+        ["Phase vocoder", _md("pv", "cents_median"), _md("pv", "within_semitone_pct")],
+        ["PV + formantes", _md("pv_formant", "cents_median"), _md("pv_formant", "within_semitone_pct")],
+    ], col_w=[CONTENT_W * 0.30, CONTENT_W * 0.38, CONTENT_W * 0.32])
+    p("La voz sintetizada sigue el tono de la guitarra con error mediano de pocos <b>cents</b> "
+      "(prácticamente todas las notas dentro de un semitono del objetivo), confirmando que ahora "
+      "“coincide” con la guitarra.")
+fig("fig08_stomp_f0.png", caption="Fig. 8. Miku Stomp: contorno de f0 (pYIN) y notas detectadas sobre "
+    "el espectrograma de la guitarra (tras estabilizar el seguimiento).")
+fig("fig09_stomp_modos.png", caption="Fig. 9. Miku Stomp: voz que sigue la melodía de la guitarra, "
+    "sintetizada con cada método de pitch-shift.")
 
-h1("9. Conclusiones")
+h1("9. Discusión")
+p("<b>¿Qué fue lo más difícil de comprender?</b> La propagación de fase del phase vocoder: estimar la "
+  "frecuencia instantánea por diferencia de fase entre tramas y el desenrollado módulo 2 pi; sin esa "
+  "corrección aparece <i>phasiness</i>.")
+p("<b>¿Qué fue lo más complejo de implementar?</b> La preservación de formantes por cepstrum (elegir el "
+  "lifter y el rango de ganancia de la máscara) y, en la aplicación, estabilizar pYIN y mapear el tono "
+  "de la guitarra a un registro cantable sin romper el contorno melódico.")
+p("<b>¿Qué conceptos del curso fueron más importantes?</b> STFT y enventanado, magnitud y fase de la "
+  "DFT, <i>overlap-add</i>, muestreo/interpolación y filtrado en frecuencia (máscara) guiado por cepstrum.")
+p("<b>¿La modificación mejoró, empeoró o cambió el método?</b> Lo <b>mejoró</b> en timbre: la "
+  "preservación de formantes baja la distorsión de la envolvente de ~%.1f a ~%.1f dB y mantiene F1, "
+  "conservando la ventaja de duración del phase vocoder; el costo es más cómputo y una afinación "
+  "ligeramente menos exacta (aún sub-audible) que el remuestreo."
+  % (FO["resample"]["lsd_mean_db"], FO["pv_formant"]["lsd_mean_db"]))
+p("<b>¿Cuándo funciona bien?</b> En desplazamientos moderados (-7 a +3 semitonos) sobre sonidos "
+  "cuasi-estacionarios; y en la aplicación, la voz sigue la melodía con error de pocos cents.")
+p("<b>¿Cuándo falla?</b> En saltos grandes (>= +5/+7 semitonos) la corrección de formantes se degrada "
+  "(Fig. 3 y 4) y el phase vocoder <b>emborrona los transitorios</b> con algo de <i>phasiness</i>; en "
+  "el stomp, notas muy graves de la guitarra deben plegarse de octava para ser cantables.")
+p("<b>¿Qué haríamos con más tiempo?</b> <i>Phase-locking</i> (Laroche–Dolson) para reducir phasiness, "
+  "TD-PSOLA como comparador en el dominio del tiempo, envolventes por LPC, y una versión en tiempo real.")
+
+h1("10. Conclusiones")
 p("Se reprodujo con éxito el phase vocoder de Dolson y se verificó su propiedad central: cambiar la "
   "duración sin alterar el tono. La extensión con preservación de formantes mejora claramente el "
   "timbre (LSD de %.1f a %.1f dB) conservando la ventaja de duración del phase vocoder, a costa de "
-  "más cómputo y con fallas en saltos extremos. El proyecto se apoya íntegramente en herramientas "
-  "clásicas del curso." % (FO["resample"]["lsd_mean_db"], FO["pv_formant"]["lsd_mean_db"]))
+  "más cómputo y con fallas en saltos extremos. Como aplicación, el “Miku Stomp digital” logra que una "
+  "voz siga la melodía de la guitarra de forma afinada (error de pocos cents) usando solo DSP del "
+  "curso. El proyecto se apoya íntegramente en herramientas clásicas." %
+  (FO["resample"]["lsd_mean_db"], FO["pv_formant"]["lsd_mean_db"]))
 p("<b>Trabajo futuro:</b> <i>phase-locking</i> (Laroche–Dolson) para reducir phasiness, comparación "
-  "con TD-PSOLA en el dominio del tiempo, y envolventes por LPC.")
+  "con TD-PSOLA en el dominio del tiempo, envolventes por LPC, polifonía y una versión en tiempo real.")
 
-h1("10. Código reutilizado y herramientas")
+h1("11. Código reutilizado y herramientas")
 p("Se reutilizaron del proyecto previo <font face='Courier'>miku_pedal.ipynb</font> las utilidades de "
   "señal, el análisis de Fourier, la base de granos y la síntesis concatenativa (marcadas "
   "<font face='Courier'>[Reutilizado]</font> en <font face='Courier'>vocoder.py</font>). Son "
   "<b>desarrollo propio</b> de este proyecto: el phase vocoder, la preservación de formantes por "
-  "cepstrum, todas las métricas y los experimentos. Bibliotecas: NumPy, SciPy, Matplotlib, soundfile, "
-  "reportlab, nbformat. Se usó asistencia de IA como apoyo de programación y redacción, revisada por el autor.")
+  "cepstrum, las métricas, los experimentos y el pipeline del pedal en "
+  "<font face='Courier'>stomp.py</font> (pYIN, segmentación de notas y síntesis glissando). "
+  "Bibliotecas: NumPy, SciPy, Matplotlib, soundfile, librosa (solo pYIN), reportlab, nbformat. Se usó "
+  "asistencia de IA como apoyo de programación y redacción, revisada por el autor.")
 
 h1("Referencias")
 p("[1] M. Dolson, “The Phase Vocoder: A Tutorial”, <i>Computer Music Journal</i>, vol. 10, n.º 4, "

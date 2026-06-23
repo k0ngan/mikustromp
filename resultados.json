@@ -1090,5 +1090,24 @@
       "dur_s": 8.0,
       "centroid": 1206.9254140302983
     }
+  },
+  "stomp": {
+    "voice_f0": 293.77285039311727,
+    "global_octave": 0,
+    "n_notas": 10,
+    "afinacion": {
+      "resample": {
+        "cents_median": 8.82590646912453,
+        "within_semitone_pct": 100.0
+      },
+      "pv": {
+        "cents_median": 5.000000000000041,
+        "within_semitone_pct": 100.0
+      },
+      "pv_formant": {
+        "cents_median": 8.825906469124627,
+        "within_semitone_pct": 98.27586206896551
+      }
+    }
   }
 }
