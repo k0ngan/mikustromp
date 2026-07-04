@@ -5,3 +5,5 @@ __pycache__/
 presentacion/segmentos/
 presentacion/audio/
 presentacion/slides/
+mic_input.webm
+*.webm

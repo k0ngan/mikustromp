@@ -1,9 +1,10 @@
-# Phase Vocoder (Dolson 1986) + "Pedal Miku" — Proyecto Semestral PDDI
+# Autotune con voz de Miku — Proyecto Semestral PDDI
 
-Reproducción del **phase vocoder** de Dolson y una **extensión propia** (preservación de
-formantes), aplicadas a un sintetizador concatenativo de voz hecha con granos de guitarra.
-**Solo técnicas clásicas del curso** (Fourier, STFT, enventanado, filtrado, cepstrum); sin
-machine learning, deep learning ni LLM.
+Un **autotune** que toma **tu voz** cantada, **corrige la afinación** a las notas de una escala
+(el "snap") y le **transfiere el timbre (formantes) de Hatsune Miku** — conservando tu interpretación
+(melodía y ritmo). El motor reproduce el **phase vocoder** de Dolson (1986) y una **extensión propia**
+(preservación de formantes por cepstrum). **Solo técnicas clásicas del curso** (Fourier, STFT,
+enventanado, filtrado, cepstrum, autocorrelación/pYIN); sin machine learning, deep learning ni LLM.
 
 **Procesamiento Digital de Señales e Imágenes (INFB6063) — UTEM 2026-1**
 Francisco Alejandro Pinto Abraham — RUT 21.571.239-7
@@ -15,10 +16,20 @@ Francisco Alejandro Pinto Abraham — RUT 21.571.239-7
 
 ## Idea en una línea
 
-Cambiar el **tono** de un sonido **sin cambiar su duración** (phase vocoder) y, como extensión,
-**sin mover los formantes** (timbre), comparándolo con el remuestreo ingenuo.
+Afinar una voz a una escala **sin cambiar su duración** (phase vocoder) y **darle el timbre de Miku**
+(transferencia de formantes por cepstrum) — un autotune completo en DSP puro.
 
 ## Resultados principales
+
+**Autotune** (voz de prueba con verdad de terreno, Do mayor):
+
+| Métrica | Antes | Después |
+|---|---|---|
+| Error de afinación medio | **~42 cents** | **~5 cents** |
+| Error de duración | 0 % | **0 %** |
+| Timbre: LSD de la envolvente a Miku | ~5.3 dB | **~4.2 dB** |
+
+**Motor (phase vocoder), validación del pitch-shift:**
 
 | Método | Error duración | Error afinación | Formantes (LSD env.) |
 |---|---|---|---|
@@ -31,8 +42,12 @@ Cambiar el **tono** de un sonido **sin cambiar su duración** (phase vocoder) y,
 | Archivo | Descripción |
 |---|---|
 | `vocoder.py` | Núcleo DSP: STFT/ISTFT, phase vocoder, pitch-shift (resample/PV/PV+formantes), métricas. Reutiliza funciones de `miku_pedal.ipynb` (marcadas `[Reutilizado]`). |
+| **`autotune.py`** | **Motor del autotune Miku:** snap a la escala, corrección de tono variable en el tiempo (por bloques + overlap-add) y transferencia de formantes de Miku. Reusa `vocoder.py`. |
+| **`generar_resultados_autotune.py`** | Experimentos del autotune → figuras `at_*.png`, audios `outputs/at_*.wav`, `resultados_autotune.json`. Semilla 2026. |
+| **`construir_autotune.py`** | Arma `miku_autotune_colab.ipynb` (embebe el núcleo DSP + la voz de Miku). |
+| **`miku_autotune_colab.ipynb`** | **Cuaderno Colab autocontenido** del autotune Miku (sube/graba tu voz → afina + timbre Miku). |
 | `descargar_datos.py` | Descarga idempotente de `guitarra.mp3` (respaldo local si no hay red). |
-| `generar_resultados.py` | Corre los experimentos → `figuras/`, `outputs/*.wav`, `resultados.json`. Semilla fija. |
+| `generar_resultados.py` | Corre los experimentos del phase vocoder → `figuras/`, `outputs/*.wav`, `resultados.json`. Semilla fija. |
 | `construir_notebook.py` | Arma `phase_vocoder_pddi.ipynb` con `nbformat`. |
 | `phase_vocoder_pddi.ipynb` | **Notebook reproducible** (informe-laboratorio ejecutable de punta a punta). |
 | `generar_informe.py` | Genera el informe PDF (estructura tipo IEEE) con `reportlab`. |
@@ -44,6 +59,28 @@ Cambiar el **tono** de un sonido **sin cambiar su duración** (phase vocoder) y,
 | `construir_stomp.py` | Arma `miku_stomp_colab.ipynb` (embebe el núcleo DSP). |
 | `miku_stomp_colab.ipynb` | **Cuaderno Colab autocontenido** del "Miku Stomp digital". |
 | `figuras/`, `outputs/`, `data/` | Figuras PNG, audios `.wav`, y caché del audio. |
+
+## Autotune con voz de Miku (Colab): afina tu voz y ponle timbre de Miku
+
+`miku_autotune_colab.ipynb` es la **aplicación principal**. Flujo en DSP puro:
+**seguir el tono (pYIN) → pegarlo a la escala (snap) → corregir con phase vocoder preservando
+formantes → imponer la envolvente de Miku (cepstrum)**. Conserva tu melodía y ritmo; solo cambia
+afinación y timbre. **Funciona en vivo con audios nuevos:** sube un `.wav`/`.mp3`, **graba con el
+micrófono** en Colab (`USE_MIC = True`), o usa una voz de prueba desafinada.
+
+- **Perillas:** `KEY`/`SCALE` (escala destino: `chromatic`/`major`/`minor`/`pentatonic`), `STRENGTH`
+  (0–1, dureza del snap), `RETUNE_SPEED` (0–1, 1 = enganche instantáneo "T-Pain"), `MIKU_AMOUNT`
+  (0–1, cuánto timbre de Miku), `OCTAVE`.
+- **Voz de Miku incluida** (Vocaloid 4 CyberDiva, uso académico) embebida como referencia de timbre.
+- Autocontenido (embebe el núcleo DSP) y corre en **Colab** y **local** de principio a fin.
+- **Límite honesto:** es monofónico y funciona **por lotes** (graba/sube → procesa → reproduce), no en
+  streaming de latencia cero. Una versión en tiempo real (`sounddevice`/plugin) es trabajo futuro.
+
+```bash
+python generar_resultados_autotune.py   # figuras at_*.png + outputs/at_*.wav + resultados_autotune.json
+python construir_autotune.py            # arma miku_autotune_colab.ipynb
+jupyter nbconvert --to notebook --execute --inplace miku_autotune_colab.ipynb   # prueba local
+```
 
 ## Modo Stomp (Colab): replicar el pedal Korg Miku Stomp
 
@@ -73,11 +110,13 @@ para el video).
 
 ```bash
 cd proyecto_phase_vocoder
-python descargar_datos.py        # obtiene guitarra.mp3 (una vez)
-python generar_resultados.py     # figuras/ + outputs/ + resultados.json
-python construir_notebook.py     # arma el notebook
-jupyter nbconvert --to notebook --execute --inplace phase_vocoder_pddi.ipynb
-python generar_informe.py        # informe PDF
+python descargar_datos.py             # obtiene guitarra.mp3 (una vez)
+python generar_resultados.py          # motor phase vocoder: figuras/ + outputs/ + resultados.json
+python generar_resultados_autotune.py # autotune: at_*.png + outputs/at_*.wav + resultados_autotune.json
+python construir_autotune.py          # arma miku_autotune_colab.ipynb (aplicación principal)
+python construir_notebook.py          # arma phase_vocoder_pddi.ipynb (laboratorio del motor)
+jupyter nbconvert --to notebook --execute --inplace miku_autotune_colab.ipynb
+python generar_informe.py             # informe PDF (autotune como eje)
 python presentacion/build_presentation.py   # video narrado (opcional)
 ```
 

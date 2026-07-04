@@ -28,6 +28,10 @@ FO = R["formantes_resumen"]
 RE = R["reproduccion"]
 ST = R.get("stomp", {})
 
+# Resultados del autotune (aplicación principal). Guardado por si no se ha generado aún.
+_at_path = os.path.join(HERE, "resultados_autotune.json")
+AT = json.load(open(_at_path, encoding="utf-8")) if os.path.exists(_at_path) else {}
+
 PAGE_W = A4[0]
 MARGIN = 2.2 * cm
 CONTENT_W = PAGE_W - 2 * MARGIN
@@ -81,8 +85,8 @@ def tabla(data, col_w=None):
 
 # ===================================================================== Portada
 story.append(Spacer(1, 1.2 * cm))
-story.append(Paragraph("Cambio de tono sin alterar la duración: reproducción del "
-                       "<i>phase vocoder</i> de Dolson y una extensión con preservación de formantes", TITLE))
+story.append(Paragraph("Autotune con voz de Miku: corrección de afinación y transferencia de formantes "
+                       "sobre el <i>phase vocoder</i> de Dolson (DSP clásico, sin aprendizaje profundo)", TITLE))
 sp(10)
 story.append(Paragraph("Proyecto Semestral — Procesamiento Digital de Señales e Imágenes (INFB6063)", SUB))
 story.append(Paragraph("Universidad Tecnológica Metropolitana (UTEM) — 2026-1", SUB))
@@ -92,21 +96,26 @@ sp(14)
 story.append(Paragraph("<b>Artículo reproducido:</b> M. Dolson, “The Phase Vocoder: A Tutorial”, "
                        "<i>Computer Music Journal</i>, vol. 10, n.º 4, pp. 14–27, 1986.", BODY))
 sp(8)
-story.append(Paragraph("<b>Resumen —</b> Se reproduce el <i>phase vocoder</i> de Dolson (1986), que "
-    "modifica la duración de un sonido sin alterar su tono propagando la fase de la STFT mediante la "
-    "frecuencia instantánea, y a partir de él un desplazamiento de tono (<i>pitch-shift</i>) como "
-    "<i>time-stretch</i> + remuestreo. Como extensión propia se añade la <b>preservación de "
-    "formantes</b> reimponiendo, vía cepstrum, la envolvente espectral original. Los tres métodos "
-    "—remuestreo ingenuo (baseline), phase vocoder y phase vocoder con formantes— se integran en un "
-    "sintetizador concatenativo de voz hecha con granos de guitarra (“Pedal Miku”) y se evalúan con "
-    "señales sintéticas de verdad de terreno conocida y con audio real. El remuestreo deforma la "
-    "duración hasta ±50 %%; el phase vocoder la conserva (0 %%) con error de afinación &lt; 5 cents; y "
-    "la extensión reduce la distorsión de la envolvente de ~%.1f dB a ~%.1f dB manteniendo el "
-    "formante F1. Sólo se usan técnicas clásicas del curso (Fourier, STFT, enventanado, filtrado, "
-    "cepstrum); sin aprendizaje profundo." % (FO["resample"]["lsd_mean_db"], FO["pv_formant"]["lsd_mean_db"]), ABS))
+story.append(Paragraph("<b>Resumen —</b> Se construye un <b>autotune</b> que toma una voz cantada, "
+    "corrige su afinación a las notas de una escala musical y le transfiere el <b>timbre (formantes) de "
+    "Hatsune Miku</b>, conservando la interpretación (melodía y ritmo) del cantante. El motor reproduce "
+    "el <i>phase vocoder</i> de Dolson (1986) —que cambia el tono sin alterar la duración propagando la "
+    "fase de la STFT por su frecuencia instantánea— y una <b>extensión propia</b> de preservación de "
+    "formantes por cepstrum; sobre ellos se añade el <b>seguimiento de tono</b> (pYIN/autocorrelación), "
+    "el <b>“snap” a la escala</b> y la <b>transferencia de la envolvente de Miku</b>. En una voz de "
+    "prueba con verdad de terreno, el autotune reduce el error de afinación de %.0f a %.0f cents, "
+    "<b>conserva la duración</b> (0 %%) y acerca la envolvente al timbre de Miku (distancia log-espectral "
+    "de %.1f a %.1f dB). Como validación del motor, el remuestreo ingenuo deforma la duración hasta "
+    "±50 %% mientras el phase vocoder la mantiene, y la extensión baja la distorsión de la envolvente de "
+    "~%.1f a ~%.1f dB. Solo se usan técnicas clásicas del curso (Fourier, STFT, enventanado, filtrado, "
+    "cepstrum); sin aprendizaje profundo." % (
+        AT.get("cents_abs_medio", {}).get("antes", 42), AT.get("cents_abs_medio", {}).get("despues", 5),
+        AT.get("lsd_envolvente_a_miku_dB", {}).get("autotune", 5.5),
+        AT.get("lsd_envolvente_a_miku_dB", {}).get("miku", 4.2),
+        FO["resample"]["lsd_mean_db"], FO["pv_formant"]["lsd_mean_db"]), ABS))
 sp(8)
-story.append(Paragraph("<b>Palabras clave —</b> phase vocoder, STFT, frecuencia instantánea, "
-                       "pitch-shifting, formantes, cepstrum, síntesis concatenativa.", BODY))
+story.append(Paragraph("<b>Palabras clave —</b> autotune, corrección de afinación, voz de Miku, "
+                       "phase vocoder, STFT, frecuencia instantánea, formantes, cepstrum, snap a escala.", BODY))
 story.append(PageBreak())
 
 # ===================================================================== 1. Introducción
@@ -117,8 +126,10 @@ p("Modificar el <b>tono</b> de un sonido sin cambiar su <b>duración</b> es una 
   "produciendo el característico efecto “ardilla”. El reto es desacoplar tono, duración y timbre.")
 p("Este trabajo reproduce el <i>phase vocoder</i> propuesto por Dolson [1], implementa con él un "
   "desplazamiento de tono que conserva la duración, y propone una <b>extensión</b> que además conserva "
-  "los formantes. Los métodos se prueban dentro de un sintetizador concatenativo que arma una "
-  "“voz” a partir de granos de una guitarra, reutilizado de un proyecto previo del curso.")
+  "los formantes. Sobre esa base se construye la <b>aplicación principal</b>: un <b>autotune con voz de "
+  "Miku</b> (Sec. 8) que sigue el tono de una voz, lo <b>pega a las notas de una escala</b> y le "
+  "<b>transfiere el timbre de Hatsune Miku</b>. La misma maquinaria se reutiliza en una aplicación "
+  "secundaria —el “Miku Stomp” de guitarra (Sec. 9)—, reutilizada de un proyecto previo del curso.")
 
 h1("2. Resumen explicado del artículo")
 p("El phase vocoder analiza la señal con la <b>STFT</b>: en cada ventana se obtiene, por banda de "
@@ -143,6 +154,9 @@ tabla([
     ["Síntesis por superposición (overlap-add)", "Unit 2 – L1/L2 (enventanado, superposición)"],
     ["Pitch-shift = stretch + remuestreo", "Unit 1 – L3 (muestreo/interpolación)"],
     ["Preservación de formantes (máscara H[k])", "Unit 2 – L3 (filtro como máscara) + cepstrum"],
+    ["Seguimiento de tono f0 (autotune)", "Unit 1 – L1/L2 (autocorrelación/periodicidad)"],
+    ["“Snap” a la escala (f0 -&gt; nota MIDI)", "logaritmos de frecuencia; cuantización"],
+    ["Transferencia de timbre de Miku", "Unit 2 – L3 (máscara espectral) + cepstrum"],
 ], col_w=[CONTENT_W * 0.55, CONTENT_W * 0.45])
 
 h1("4. Metodología original (reproducción)")
@@ -222,7 +236,45 @@ fig("fig05_grano_real.png", caption="Fig. 5. Grano de guitarra desplazado +7 sem
 fig("fig06_sintesis_ondas.png", caption="Fig. 6. Formas de onda de la voz concatenativa por método.")
 fig("fig07_sintesis_espectros.png", caption="Fig. 7. Espectrogramas de la voz sintetizada por método.")
 
-h1("8. Aplicación alternativa: Miku Stomp digital")
+h1("8. Aplicación principal: Autotune con voz de Miku")
+p("La aplicación central del proyecto es un <b>autotune</b>: dada una voz cantada, (i) se estima su "
+  "<b>contorno de tono</b> f0 cuadro a cuadro (pYIN/autocorrelación); (ii) cada tono se pasa a número "
+  "MIDI (<font face='Courier'>m = 69 + 12 log2(f/440)</font>) y se <b>redondea a la nota de la escala</b> "
+  "más cercana (el “snap”); (iii) la diferencia en semitonos se corrige de forma <b>variable en el "
+  "tiempo</b> con el phase vocoder <b>preservando los formantes</b> (Sec. 5), reconstruyendo por "
+  "<i>overlap-add</i>, por lo que la <b>duración se conserva</b>; y (iv) se estima la <b>envolvente de "
+  "formantes de una voz real de Miku</b> por cepstrum y se <b>impone</b> sobre la voz afinada como una "
+  "máscara <font face='Courier'>H = env_Miku / env_voz</font>. El resultado mantiene la melodía y el "
+  "ritmo del cantante, pero suena <b>afinado</b> y con <b>timbre de Miku</b>.")
+p("Dos perillas gobiernan el efecto: <b>strength</b> (0 a 1) mezcla el tono medido con la nota pegada "
+  "(1 = enganche total, efecto “T-Pain”) y <b>retune_speed</b> controla la velocidad de enganche "
+  "(valores bajos dan un glissando natural). Se evaluó con una voz de prueba de <b>verdad de terreno "
+  "conocida</b>: una secuencia de vocales en Do mayor deliberadamente <b>desafinada</b> ±30 a 50 cents.")
+if AT:
+    _cm = AT.get("cents_abs_medio", {})
+    _du = AT.get("duracion_error_pct", {})
+    _ls = AT.get("lsd_envolvente_a_miku_dB", {})
+    tabla([
+        ["Métrica", "Antes / entrada", "Después"],
+        ["Error de afinación medio [cents]", "%.0f" % _cm.get("antes", 0), "%.0f" % _cm.get("despues", 0)],
+        ["Error de duración [%]", "0.0", "%.1f" % _du.get("miku", 0.0)],
+        ["LSD de la envolvente a Miku [dB]", "%.2f" % _ls.get("entrada", 0), "%.2f" % _ls.get("miku", 0)],
+    ], col_w=[CONTENT_W * 0.46, CONTENT_W * 0.27, CONTENT_W * 0.27])
+    p("El autotune baja el error de afinación de %.0f a %.0f cents (las notas quedan sobre la escala), "
+      "<b>conserva la duración</b> y acerca la envolvente al timbre de Miku (LSD de %.2f a %.2f dB). La "
+      "corrección preserva los formantes de la voz durante el afinado y recién en el último paso se "
+      "sustituyen por los de Miku, de forma controlada." % (
+          _cm.get("antes", 0), _cm.get("despues", 0), _ls.get("entrada", 0), _ls.get("miku", 0)))
+fig("at_01_contorno.png", caption="Fig. 8. Autotune: el tono medido (gris) se pega a las notas de la "
+    "escala (rojo) y el tono corregido (azul) queda sobre ellas.")
+fig("at_04_afinacion.png", caption="Fig. 9. Error de afinación por nota, antes vs después del autotune "
+    "(0 = afinado; líneas rojas: ±50 cents).")
+fig("at_03_formantes.png", caption="Fig. 10. Transferencia de formantes: la envolvente de la salida "
+    "(verde) adopta la de Miku (morado), alejándose de la voz de entrada (gris).")
+fig("at_02_espectrograma.png", caption="Fig. 11. Espectrogramas de la voz de entrada (desafinada) y de "
+    "la salida (afinada y con timbre de Miku).")
+
+h1("9. Aplicación secundaria: Miku Stomp digital (guitarra)")
 p("Como aplicación, se replicó el flujo del pedal <b>Korg Miku Stomp</b> en DSP puro: "
   "<b>guitarra -&gt; detectar la nota -&gt; afinar una voz a esa nota -&gt; mezclar</b>. La detección de tono usa "
   "<b>pYIN</b> (YIN probabilístico, algoritmo clásico, no una red neuronal); la voz se afina con el "
@@ -249,12 +301,12 @@ if ST.get("afinacion"):
     p("La voz sintetizada sigue el tono de la guitarra con error mediano de pocos <b>cents</b> "
       "(prácticamente todas las notas dentro de un semitono del objetivo), confirmando que ahora "
       "“coincide” con la guitarra.")
-fig("fig08_stomp_f0.png", caption="Fig. 8. Miku Stomp: contorno de f0 (pYIN) y notas detectadas sobre "
+fig("fig08_stomp_f0.png", caption="Fig. 12. Miku Stomp: contorno de f0 (pYIN) y notas detectadas sobre "
     "el espectrograma de la guitarra (tras estabilizar el seguimiento).")
-fig("fig09_stomp_modos.png", caption="Fig. 9. Miku Stomp: voz que sigue la melodía de la guitarra, "
+fig("fig09_stomp_modos.png", caption="Fig. 13. Miku Stomp: voz que sigue la melodía de la guitarra, "
     "sintetizada con cada método de pitch-shift.")
 
-h1("9. Discusión")
+h1("10. Discusión")
 p("<b>¿Qué fue lo más difícil de comprender?</b> La propagación de fase del phase vocoder: estimar la "
   "frecuencia instantánea por diferencia de fase entre tramas y el desenrollado módulo 2 pi; sin esa "
   "corrección aparece <i>phasiness</i>.")
@@ -276,23 +328,29 @@ p("<b>¿Cuándo falla?</b> En saltos grandes (>= +5/+7 semitonos) la corrección
 p("<b>¿Qué haríamos con más tiempo?</b> <i>Phase-locking</i> (Laroche–Dolson) para reducir phasiness, "
   "TD-PSOLA como comparador en el dominio del tiempo, envolventes por LPC, y una versión en tiempo real.")
 
-h1("10. Conclusiones")
-p("Se reprodujo con éxito el phase vocoder de Dolson y se verificó su propiedad central: cambiar la "
-  "duración sin alterar el tono. La extensión con preservación de formantes mejora claramente el "
-  "timbre (LSD de %.1f a %.1f dB) conservando la ventaja de duración del phase vocoder, a costa de "
-  "más cómputo y con fallas en saltos extremos. Como aplicación, el “Miku Stomp digital” logra que una "
-  "voz siga la melodía de la guitarra de forma afinada (error de pocos cents) usando solo DSP del "
-  "curso. El proyecto se apoya íntegramente en herramientas clásicas." %
-  (FO["resample"]["lsd_mean_db"], FO["pv_formant"]["lsd_mean_db"]))
+h1("11. Conclusiones")
+p("Se construyó un <b>autotune con voz de Miku</b> que afina una voz a una escala (error de afinación "
+  "de %.0f a %.0f cents) <b>sin alterar su duración</b> y le transfiere el timbre de Miku (LSD de la "
+  "envolvente de %.2f a %.2f dB). Para ello se reprodujo con éxito el phase vocoder de Dolson —cuya "
+  "propiedad central, cambiar el tono sin alterar la duración, se verificó— y su extensión con "
+  "preservación de formantes, que mejora el timbre (LSD de %.1f a %.1f dB) a costa de más cómputo y con "
+  "fallas en saltos extremos. La misma maquinaria sirve la aplicación secundaria (“Miku Stomp” de "
+  "guitarra). El proyecto se apoya íntegramente en herramientas clásicas del curso." % (
+      AT.get("cents_abs_medio", {}).get("antes", 42), AT.get("cents_abs_medio", {}).get("despues", 5),
+      AT.get("lsd_envolvente_a_miku_dB", {}).get("entrada", 5.3),
+      AT.get("lsd_envolvente_a_miku_dB", {}).get("miku", 4.2),
+      FO["resample"]["lsd_mean_db"], FO["pv_formant"]["lsd_mean_db"]))
 p("<b>Trabajo futuro:</b> <i>phase-locking</i> (Laroche–Dolson) para reducir phasiness, comparación "
   "con TD-PSOLA en el dominio del tiempo, envolventes por LPC, polifonía y una versión en tiempo real.")
 
-h1("11. Código reutilizado y herramientas")
+h1("12. Código reutilizado y herramientas")
 p("Se reutilizaron del proyecto previo <font face='Courier'>miku_pedal.ipynb</font> las utilidades de "
   "señal, el análisis de Fourier, la base de granos y la síntesis concatenativa (marcadas "
   "<font face='Courier'>[Reutilizado]</font> en <font face='Courier'>vocoder.py</font>). Son "
   "<b>desarrollo propio</b> de este proyecto: el phase vocoder, la preservación de formantes por "
-  "cepstrum, las métricas, los experimentos y el pipeline del pedal en "
+  "cepstrum, las métricas, los experimentos, el <b>motor de autotune</b> en "
+  "<font face='Courier'>autotune.py</font> (snap a la escala, corrección variable en el tiempo y "
+  "transferencia de formantes de Miku) y el pipeline del pedal en "
   "<font face='Courier'>stomp.py</font> (pYIN, segmentación de notas y síntesis glissando). "
   "Bibliotecas: NumPy, SciPy, Matplotlib, soundfile, librosa (solo pYIN), reportlab, nbformat. Se usó "
   "asistencia de IA como apoyo de programación y redacción, revisada por el autor.")
