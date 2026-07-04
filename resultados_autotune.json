@@ -1,0 +1,114 @@
+{
+  "seed": 2026,
+  "sr": 22050,
+  "referencia_timbre": "miku_voice.wav (Vocaloid 4 CyberDiva)",
+  "afinacion_por_nota": [
+    {
+      "nota_midi": 60,
+      "f_objetivo": 261.63,
+      "f_antes": 266.68,
+      "cents_antes": 33.1,
+      "f_despues": 263.41,
+      "cents_despues": 11.8
+    },
+    {
+      "nota_midi": 62,
+      "f_objetivo": 293.66,
+      "f_antes": 287.31,
+      "cents_antes": -37.9,
+      "f_despues": 293.94,
+      "cents_despues": 1.6
+    },
+    {
+      "nota_midi": 64,
+      "f_objetivo": 329.63,
+      "f_antes": 338.54,
+      "cents_antes": 46.2,
+      "f_despues": 329.54,
+      "cents_despues": -0.5
+    },
+    {
+      "nota_midi": 65,
+      "f_objetivo": 349.23,
+      "f_antes": 340.44,
+      "cents_antes": -44.1,
+      "f_despues": 348.65,
+      "cents_despues": -2.9
+    },
+    {
+      "nota_midi": 67,
+      "f_objetivo": 392.0,
+      "f_antes": 403.17,
+      "cents_antes": 48.7,
+      "f_despues": 390.46,
+      "cents_despues": -6.8
+    },
+    {
+      "nota_midi": 69,
+      "f_objetivo": 440.0,
+      "f_antes": 451.47,
+      "cents_antes": 44.6,
+      "f_despues": 440.74,
+      "cents_despues": 2.9
+    },
+    {
+      "nota_midi": 67,
+      "f_objetivo": 392.0,
+      "f_antes": 381.51,
+      "cents_antes": -46.9,
+      "f_despues": 393.06,
+      "cents_despues": 4.7
+    },
+    {
+      "nota_midi": 64,
+      "f_objetivo": 329.63,
+      "f_antes": 323.12,
+      "cents_antes": -34.5,
+      "f_despues": 328.26,
+      "cents_despues": -7.2
+    }
+  ],
+  "cents_abs_medio": {
+    "antes": 42.0,
+    "despues": 4.8
+  },
+  "duracion_error_pct": {
+    "autotune": 0.0,
+    "miku": 0.0
+  },
+  "lsd_envolvente_a_miku_dB": {
+    "entrada": 5.33,
+    "autotune": 6.1,
+    "miku": 3.33
+  },
+  "centroides_hz": {
+    "entrada": 2784.3,
+    "miku_ref": 1976.6,
+    "salida_miku": 2659.1,
+    "env_entrada": 2926.3,
+    "env_miku_ref": 2697.3,
+    "env_salida_miku": 3146.1
+  },
+  "parametros": {
+    "key": "C",
+    "scale": "major",
+    "strength": 1.0,
+    "retune_speed": 1.0,
+    "octave": "auto",
+    "octave_K": 0,
+    "miku_amount": 0.9,
+    "method": "pv_formant"
+  },
+  "figuras": [
+    "at_01_contorno.png",
+    "at_02_espectrograma.png",
+    "at_03_formantes.png",
+    "at_04_afinacion.png"
+  ],
+  "audios": [
+    "at_entrada.wav",
+    "at_autotune.wav",
+    "at_miku.wav",
+    "at_miku_ref.wav"
+  ]
+}
